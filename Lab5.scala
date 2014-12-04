@@ -196,9 +196,13 @@ object Lab5 extends jsy.util.JsyApplication {
       
       case Unary(Cast(t), e1) => if( castOk(typ(e1), t) ) t else err(t, e1)
       
-      case Assign(Var(x), e1) => ( env.get(x).isDefined && typ(Var(x)) == typeInfer(env, e1) ) match {
-        case true  => typ(Var(x))
-        case false => err(typ(Var(x)), Var(x))
+      case Assign(e1, e2) => e1 match{
+        case Var(x) => ( env.get(x).isDefined && typ(Var(x)) == typeInfer(env, e2) && env(x)._1 != MConst) match {
+        	case true  => typ(Var(x))
+        	case false => err(typ(Var(x)), Var(x))
+        }
+        case GetField(e3,x) => if(typ(e1)==typ(e2)) typ(e2) else err(typ(e2), e2)
+        case _ => err(typ(e1), e1)
       }
     		  
       /*** END: Fill-in more cases here. ***/
@@ -234,7 +238,8 @@ object Lab5 extends jsy.util.JsyApplication {
   /* Capture-avoiding substitution in e replacing variables x with esub. */
   def substitute(e: Expr, esub: Expr, x: String): Expr = {
     def subst(e: Expr): Expr = substitute(e, esub, x)
-    val ep: Expr = throw new UnsupportedOperationException
+    val ep: Expr = avoidCapture(freeVars(esub), e)
+      //throw new UnsupportedOperationException
     ep match {
       case N(_) | B(_) | Undefined | S(_) | Null | A(_) => e
       case Print(e1) => Print(subst(e1))
@@ -251,22 +256,22 @@ object Lab5 extends jsy.util.JsyApplication {
       case Assign(e1, e2) => Assign(subst(e1), subst(e2))
       case InterfaceDecl(tvar, t, e1) => InterfaceDecl(tvar, t, subst(e1))
       
-      case Function(p, Left(paramse), retty, e1) => p match {      
+      case Function(p, Left(paramse), tret, e1) => p match {      
            case None => 
-             if (paramse.forall{ case(n,_) => (x!= n) } ) Function(p, Left(paramse), retty, subst(e1))   
-             else Function(p, Left(paramse), retty, e1)	
+             if (paramse.forall{ case(n,_) => (x != n) } ) Function(p, Left(paramse), tret, subst(e1))   
+             else Function(p, Left(paramse), tret, e1)	
            case Some(a) =>
-             if (paramse.forall { case(n,_) => (x!= n) } && x != a) Function(p, Left(paramse), retty, subst(e1))
-             else Function(p, Left(paramse), retty, subst(e1))
+             if (paramse.forall { case(n,_) => (x != n) } && x != a) Function(p, Left(paramse), tret, subst(e1))
+             else Function(p, Left(paramse), tret, subst(e1))
       }
             
-      case Function(p, Right(paramse@(mode, s, t)), retty, e1) => p match {    	  
+      case Function(p, Right(paramse@(mode, s, t)), tret, e1) => p match {    	  
     	  case None => 
-    	    if (x != s) Function(p, Right(paramse), retty, subst(e1))
-    	    else Function(p, Right(paramse), retty, e1)   	  
+    	    if (x != s) Function(p, Right(paramse), tret, subst(e1))
+    	    else Function(p, Right(paramse), tret, e1)   	  
     	  case Some(a) =>
-    	    if (x != s && x != a) Function(p, Right(paramse), retty, subst(e1))
-    	    Function(p, Right(paramse), retty, e1)
+    	    if (x != s && x != a) Function(p, Right(paramse), tret, subst(e1))
+    	    Function(p, Right(paramse), tret, e1)
       }
     }
   }
@@ -347,8 +352,8 @@ object Lab5 extends jsy.util.JsyApplication {
       case If(e1, e2, e3) =>
         for (e1p <- step(e1)) yield If(e1p, e2, e3)
       case Obj(fields) => fields find { case (_, ei) => !isValue(ei) } match {
-        case Some((fi,ei)) =>
-          throw new UnsupportedOperationException
+        case Some((fi,ei)) => for (eip <- step(ei)) yield eip 
+         // throw new UnsupportedOperationException
         case None => throw StuckError(e)
       }
       case GetField(e1, f) => 
