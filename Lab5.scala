@@ -4,10 +4,10 @@ object Lab5 extends jsy.util.JsyApplication {
   
   /*
    * CSCI 3155: Lab 5
-   * <Your Name>
+   * Tyler Behm
    * 
-   * Partner: <Your Partner's Name>
-   * Collaborators: <Any Collaborators>
+   * Partner: Noah Dillon
+   * Collaborators: Jessica Lynch
    */
 
   /*
@@ -37,18 +37,23 @@ object Lab5 extends jsy.util.JsyApplication {
   // Just like mapFirst from Lab 4 but uses a callback f that returns a DoWith in the Some case.
   def mapFirstWith[W,A](f: A => Option[DoWith[W,A]])(l: List[A]): DoWith[W,List[A]] = l match {
     case Nil => doreturn(l)
+     //throw new UnsupportedOperationException  
     case h :: t => f(h) match {
-      case None => mapFirstWith(f)(t).map(r=>h::r)
-      case Some(withhp) => withhp.map(r=>r::t)
+      case None => mapFirstWith(f)(t).map(r => h::r)
+       //throw new UnsupportedOperationException  
+      case Some(withhp) => withhp.map(r => r::t)
+       //throw new UnsupportedOperationException  
     }
   }
 
   /*** Casting ***/
-  
+  //Casting checks if t1 -> t2 OR t2 -> t1 cast is OK
   def castOk(t1: Typ, t2: Typ): Boolean = (t1, t2) match {
     case (TNull, TObj(_)) => true
     case (_, _) if (t1 == t2) => true
-    case (TObj(fields1), TObj(fields2)) => fields1.forall{f=>fields2.get(f._1).isDefined } || fields2.forall{f=>fields1.get(f._1).isDefined }
+    case (TObj(fields1), TObj(fields2)) => 
+      fields1.forall{ f => fields2.get(f._1).isDefined } || fields2.forall{ f => fields1.get(f._1).isDefined } 
+     //throw new UnsupportedOperationException  
     case (TInterface(tvar, t1p), _) => castOk(typSubstitute(t1p, t1, tvar), t2)
     case (_, TInterface(tvar, t2p)) => castOk(t1, typSubstitute(t2p, t2, tvar))
     case _ => false
@@ -156,8 +161,10 @@ object Lab5 extends jsy.util.JsyApplication {
         }
         // Bind to env2 an environment that extends env1 with the parameters.
         val env2 = paramse match {
-          case Left(params) => params.foldRight(env1)((a,b)=>(b+(a._1->(MConst,a._2))))
-          case Right((mode,x,t)) => env1+(x->(mut(mode),t))
+          case Left(params) => params.foldRight(env1)( (a,b) => (b + (a._1 -> (MConst, a._2))))
+          //throw new UnsupportedOperationException         
+          case Right((mode,x,t)) =>  env1 + ( x -> (mut(mode), t) )
+          //throw new UnsupportedOperationException
         }
         // Infer the type of the function body
         val t1 = typeInfer(env2, e1)
@@ -168,26 +175,33 @@ object Lab5 extends jsy.util.JsyApplication {
       case Call(e1, args) => typ(e1) match {
         case TFunction(Left(params), tret) if (params.length == args.length) => {
           (params, args).zipped.foreach {
-            (p,a) => if (p._2 == typ(a)) (p,a) else err(p._2, a)
+           (p,a) => if (p._2 == typ(a)) (p,a) else err(p._2, a)
+           //throw new UnsupportedOperationException
           }
           tret
         }
         case tgot @ TFunction(Right((mode,_,tparam)), tret) if(args.length==1) => mode match{
           case PName | PVar =>  if(castOk(typ(args(0)), tparam)) tret else err(tgot,e1)
           case PRef => if(isLExpr(args(0)) && castOk(typ(args(0)), tparam)) tret else err(tgot,e1)
+          //throw new UnsupportedOperationException
         }
         case tgot => err(tgot, e1)
       }
       
       /*** Fill-in more cases here. ***/
       
-      case Decl(mut, x, e1, e2) => typeInfer(env+(x->(mut,typ(e1))),e2)
-      
-      case Unary(Cast(t),e1) => if(castOk(typ(e1),t)) t else err(t,e1)
-      
-      case Assign(Var(x), e1) => env+(x->(env(x)._1,typ(e1))); typ(e1)
-      
       case Null => TNull
+      
+      case Decl(mut, x, e1, e2) => typeInfer( env + ( x -> (mut, typ(e1))), e2)
+      
+      case Unary(Cast(t), e1) => if( castOk(typ(e1), t) ) t else err(t, e1)
+      
+      case Assign(Var(x), e1) => ( env.get(x).isDefined && typ(Var(x)) == typeInfer(env, e1) ) match {
+        case true  => typ(Var(x))
+        case false => err(typ(Var(x)), Var(x))
+      }
+    		  
+      /*** END: Fill-in more cases here. ***/
         
       /* Should not match: non-source expressions or should have been removed */
       case A(_) | Unary(Deref, _) | InterfaceDecl(_, _, _) => throw new IllegalArgumentException("Gremlins: Encountered unexpected expression %s.".format(e))
@@ -220,7 +234,7 @@ object Lab5 extends jsy.util.JsyApplication {
   /* Capture-avoiding substitution in e replacing variables x with esub. */
   def substitute(e: Expr, esub: Expr, x: String): Expr = {
     def subst(e: Expr): Expr = substitute(e, esub, x)
-    val ep: Expr = avoidCapture(freeVars(esub), e) // ??????
+    val ep: Expr = throw new UnsupportedOperationException
     ep match {
       case N(_) | B(_) | Undefined | S(_) | Null | A(_) => e
       case Print(e1) => Print(subst(e1))
@@ -229,13 +243,43 @@ object Lab5 extends jsy.util.JsyApplication {
       case If(e1, e2, e3) => If(subst(e1), subst(e2), subst(e3))
       case Var(y) => if (x == y) esub else e
       case Decl(mut, y, e1, e2) => Decl(mut, y, subst(e1), if (x == y) e2 else subst(e2))
-      case Function(p, paramse, retty, e1) =>
-        throw new UnsupportedOperationException
+     // case Function(p, paramse, retty, e1) =>
+       // throw new UnsupportedOperationException
       case Call(e1, args) => Call(subst(e1), args map subst)
       case Obj(fields) => Obj(fields map { case (fi,ei) => (fi, subst(ei)) })
       case GetField(e1, f) => GetField(subst(e1), f)
       case Assign(e1, e2) => Assign(subst(e1), subst(e2))
       case InterfaceDecl(tvar, t, e1) => InterfaceDecl(tvar, t, subst(e1))
+      
+      //***** Function Substitution *****//
+      //p = func name, paramse = parameter expressions, retty = return type, e1 = func body
+      //Checking on args/params: this part same as lab4
+      case Function(p, Left(paramse), retty, e1) => p match {     
+    	  //ANONYMOUS FUNCTION: 
+           case None => 
+             //For all params, if var name is not tuple_1, subst on e1 else return the function itself.
+             if (paramse.forall{ case(n,_) => (x!= n) } ) Function(p, Left(paramse), retty, subst(e1))   
+             else Function(p, Left(paramse), retty, e1)	
+           //NAMED FUNCTION:  
+           case Some(a) =>
+             //Same as above, but also check if x != a.
+             if (paramse.forall { case(n,_) => (x!= n) } && x != a) Function(p, Left(paramse), retty, subst(e1))
+             else Function(p, Left(paramse), retty, subst(e1))
+      }
+            
+      //Check mode and do appropriate thing for pass by name, value and reference;
+      //for paramse, need to check mode, string, type.
+      case Function(p, Right(paramse@(mode, s, t)), retty, e1) => p match {    	  
+    	  //If unnamed function with modes, check if string x in parameters.
+    	  //If not, substitute on body and return function with body e1.
+    	  case None => 
+    	    if (x != s) Function(p, Right(paramse), retty, subst(e1))
+    	    else Function(p, Right(paramse), retty, e1)   	  
+    	  //Same as above but check equivalence with a as well.
+    	  case Some(a) =>
+    	    if (x != s && x != a) Function(p, Right(paramse), retty, subst(e1))
+    	    Function(p, Right(paramse), retty, e1)
+      }
     }
   }
 
@@ -273,7 +317,7 @@ object Lab5 extends jsy.util.JsyApplication {
       case Binary(Div, N(n1), N(n2)) => doreturn( N(n1 / n2) )
       case If(B(b1), e2, e3) => doreturn( if (b1) e2 else e3 )
       case Obj(fields) if (fields forall { case (_, vi) => isValue(vi)}) =>
-        throw new UnsupportedOperationException
+      	Mem.alloc(Obj(fields)) map { (a:A) => a:Expr }
       case GetField(a @ A(_), f) =>
         throw new UnsupportedOperationException
         
@@ -288,12 +332,15 @@ object Lab5 extends jsy.util.JsyApplication {
         } 
       
       case Decl(MConst, x, v1, e2) if isValue(v1) =>
-        throw new UnsupportedOperationException
+        doreturn(substitute(e2, v1, x))
+        //throw new UnsupportedOperationException
       case Decl(MVar, x, v1, e2) if isValue(v1) =>
-        throw new UnsupportedOperationException
+        Mem.alloc(v1) map { a => substitute(e2, Unary(Deref, a), x)}
+        //throw new UnsupportedOperationException
 
       case Assign(Unary(Deref, a @ A(_)), v) if isValue(v) =>
-        for (_ <- domodify { (m: Mem) => (throw new UnsupportedOperationException): Mem }) yield v
+        for (_ <- domodify { (m: Mem) => ( m.+(a, v) ): Mem }) yield v
+         //throw new UnsupportedOperationException
         
       /*** Fill-in more Do cases here. ***/
       
@@ -316,9 +363,20 @@ object Lab5 extends jsy.util.JsyApplication {
           throw new UnsupportedOperationException
         case None => throw StuckError(e)
       }
-      case GetField(e1, f) => throw new UnsupportedOperationException
+      case GetField(e1, f) => 
+      	for (e1p <- step(e1)) yield GetField(e1p, f)
+      	//throw new UnsupportedOperationException
       
       /*** Fill-in more Search cases here. ***/
+      case Decl(mut, x, e1, e2) => {
+        for (e1p <- step(e1)) yield Decl(mut, x, e1p, e2)
+      }
+      case Call(e1, e2) => {
+        for (e1p <- step(e1)) yield Call(e1p, e2)
+      }
+      case Assign(e1, e2) => {
+        for (e2p <- step(e2)) yield Assign(e1, e2)
+      }
 
       /* Everything else is a stuck error. */
       case _ => throw StuckError(e)

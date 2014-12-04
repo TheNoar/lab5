@@ -13,17 +13,25 @@ class Lab5Spec extends FlatSpec {
   }
 
   // Probably want to write some tests for castOk, typeInfer, substitute, and step.
+  
   "DoNeg" should "negate values" in {
     val e = Unary(Neg, N(42))
     val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
-//    assert(mp === Mem.empty)
+    assert(mp.isEmpty)
     assertResult(N(-42)) { ep }
+  }
+  
+  "DoInequalityString" should "compare strings with GE" in {
+    val e = Binary(Ge, S("abc"), S("xyz"))
+    val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
+    assert(mp.isEmpty)
+    assertResult(B(false)) { ep }
   }
 
   "DoSeq" should "produce second element in sequence" in {
     val e = Binary(Seq, N(1), Binary(Plus, N(2), N(3)))
     val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
-//    assert(mp === Mem.empty)
+    assert(mp.isEmpty)
     assertResult(Binary(Plus, N(2), N(3))) { ep }
   }
   "DoGetField" should "access a field from an object in memory" in {
@@ -55,5 +63,5 @@ class Lab5Spec extends FlatSpec {
       ep
     }
   }
- 
+
 }
