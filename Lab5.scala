@@ -252,7 +252,7 @@ object Lab5 extends jsy.util.JsyApplication {
       case Call(e1, args) => Call(subst(e1), args map subst)
       case Obj(fields) => Obj(fields map { case (fi,ei) => (fi, subst(ei)) })
       case GetField(e1, f) => GetField(subst(e1), f)
-      case Assign(e1, e2) => Assign(subst(e1), subst(e2))
+      case Assign(e1, e2) => Assign(e1, subst(e2))
       case InterfaceDecl(tvar, t, e1) => InterfaceDecl(tvar, t, subst(e1))
     }
   }
@@ -292,38 +292,50 @@ object Lab5 extends jsy.util.JsyApplication {
       case If(B(b1), e2, e3) => doreturn( if (b1) e2 else e3 )
       case Obj(fields) if (fields forall { case (_, vi) => isValue(vi)}) =>
         Mem.alloc(e) map {(a:A) => a:Expr }
-      case GetField(a @ A(_), f) =>
-//        doget.map(m => m.get(a) match {
-//	      	case Some(Obj(fields)) => fields.get(s) match {
-//	     		 case Some(field) => field
-//	     		 case _ => throw StuckError(e)
-//	      	}
-//	      	case _ => throw StuckError(e)
-//	    	})
-//	  	}
-        throw new UnsupportedOperationException
+      
+      case GetField(a @ A(_), f) =>{
+        doget.map(m => m.get(a) match {
+          case Some(Obj(fields)) => fields.get(f) match {
+	      		case Some(field) => field
+	      		case _ => throw StuckError(e)
+          	}
+	      case _ => throw StuckError(e)
+        })
+      }
+    
+//        throw new UnsupportedOperationException
         
       case Call(v1, args) if isValue(v1) =>
         def substfun(e1: Expr, p: Option[String]): Expr = p match {
           case None => e1
           case Some(x) => substitute(e1, v1, x)
         }
-        val eo = (v1, args) match {
+        (v1, args) match {
           /*** Fill-in the DoCall cases, the SearchCall2, the SearchCallVar, the SearchCallRef  ***/
           case (Function(p,Left(param),retty,e1), _) if(args.forall(A => isValue(A))) => {
 	            val e1p = (param, args).zipped.foldRight(e1){
 	              (zip,e2) => substitute(e2, zip._2, zip._1._1)
 	            }
-	            substfun(e1p, p)
+	            doreturn(substfun(e1p, p))
 	          }
           case (Function(p,Left(param),retty,e1), _) =>{
-        	  	val argp = mapFirstWith((e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)(Mem.empty)._2
+        	  	for (argp <- mapFirstWith( (e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)) yield 
+//        	  	val argp = mapFirstWith((e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)(Mem.empty)._2
             	Call(v1,argp)
           	}
+          case (Function(p,Right((PVar|PName,x,t)),retty,e1), _) if(args.forall(A => !isValue(A))) => 
+            for (argp <- mapFirstWith( (e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)) yield Call(v1,argp)
+            
+          case (Function(p,Right((PRef,x,t)),retty,e1), _) if(args.forall(A => !isLValue(A))) => 
+            for (argp <- mapFirstWith( (e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)) yield Call(v1,argp)
           
+          case (Function(p,Right((_,x,t)),retty,e1), _) => {
+            val e1p = substitute(e1, args(0), x)
+            doreturn(substfun(e1p, p))
+          }
+            
           case _ => throw StuckError(e)
         }
-        doreturn(eo)
       
       case Decl(MConst, x, v1, e2) if isValue(v1) => doreturn(substitute(e2, v1, x))
       
@@ -331,10 +343,42 @@ object Lab5 extends jsy.util.JsyApplication {
         Mem.alloc(v1) map {a => substitute(e2, Unary(Deref, a), x) }
 
       case Assign(Unary(Deref, a @ A(_)), v) if isValue(v) =>
-        for (_ <- domodify { (m: Mem) => (throw new UnsupportedOperationException): Mem }) yield v
+        for (_ <- domodify { (m: Mem) => ( m.+(a,v) ): Mem }) yield v
+        
+      case Assign(GetField(a @ A(_), f), v) if isValue(v) => 
+	    for(_ <- domodify { 
+	          (m: Mem) => {
+	            if(m.contains(a)){
+	              val obj = m(a)
+	              val newobj = obj match {
+	                case Obj(fields) => Obj( fields + (f -> (v)))
+	                case _ => throw StuckError(e)
+	              }
+	              m + (a -> newobj)
+	            }
+	            else m
+	          }
+	        }
+	      ) yield v
+	    
+	    
+      
+      case Assign(a, e1) if isLValue(a) => for (e1p <- step(e1)) yield Assign(a, e1p)
+      case Assign(e1, e2) => for (e1p <- step(e1)) yield Assign(e1p, e2)
+     
         
       /*** Fill-in more Do cases here. ***/
+        
+      case Unary(Cast(t), v1) if(isValue(v1) && !isLValue(v1)) => v1 match {
+        case Null => doreturn(Null)
+        case vp if(castOk(typeInfer(Map.empty, v1), t)) => doreturn(vp)
+      }
       
+      
+      case Unary(Deref, a @ A(_)) => doget.map(m => m.get(a) match{
+        case Some(v) => v
+        case None => throw StuckError(e) 
+       })
       /* Base Cases: Error Rules */
       /*** Fill-in cases here. ***/
         
@@ -354,10 +398,11 @@ object Lab5 extends jsy.util.JsyApplication {
           for (eip <- step(ei)) yield eip
         case None => throw StuckError(e)
       }
-      case GetField(e1, f) => throw new UnsupportedOperationException
+      case GetField(e1, f) => for (e1p <- step(e1)) yield GetField(e1p, f)
       
       /*** Fill-in more Search cases here. ***/
       case Call(e1, args) => for (e1p <- step(e1)) yield Call(e1p, args)
+      case Decl(MConst, x, e1, e2) => for (e1p <- step(e1)) yield Decl(MConst, x, e1p, e2)
       /* Everything else is a stuck error. */
       case _ => throw StuckError(e)
     }
