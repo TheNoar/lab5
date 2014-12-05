@@ -361,7 +361,7 @@ object Lab5 extends jsy.util.JsyApplication {
 	        }
 	      ) yield v
 	    
-	    
+//      case Assign(x @ Var(_), v1) if isValue(v1) => for(_ <- domodify{ (m:Mem) => m.+(x,v1) })
       
       case Assign(a, e1) if isLValue(a) => for (e1p <- step(e1)) yield Assign(a, e1p)
       case Assign(e1, e2) => for (e1p <- step(e1)) yield Assign(e1p, e2)
