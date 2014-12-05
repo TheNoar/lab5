@@ -252,7 +252,7 @@ object Lab5 extends jsy.util.JsyApplication {
       case Call(e1, args) => Call(subst(e1), args map subst)
       case Obj(fields) => Obj(fields map { case (fi,ei) => (fi, subst(ei)) })
       case GetField(e1, f) => GetField(subst(e1), f)
-      case Assign(e1, e2) => Assign(e1, subst(e2))
+      case Assign(e1, e2) => Assign(subst(e1), subst(e2))
       case InterfaceDecl(tvar, t, e1) => InterfaceDecl(tvar, t, subst(e1))
     }
   }
@@ -323,12 +323,16 @@ object Lab5 extends jsy.util.JsyApplication {
 //        	  	val argp = mapFirstWith((e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)(Mem.empty)._2
             	Call(v1,argp)
           	}
-          case (Function(p,Right((PVar|PName,x,t)),retty,e1), _) if(args.forall(A => !isValue(A))) => 
+          case (Function(p,Right((PName,x,t)),retty,e1), _) => doreturn(substfun(substitute(e1, args(0), x),p))
+          case (Function(p,Right((PVar,x,t)),retty,e1), _) if(args.forall(A => !isValue(A))) => 
             for (argp <- mapFirstWith( (e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)) yield Call(v1,argp)
             
           case (Function(p,Right((PRef,x,t)),retty,e1), _) if(args.forall(A => !isLValue(A))) => 
             for (argp <- mapFirstWith( (e2:Expr) => (if (isValue(e2)) None else Some(step(e2))))(args)) yield Call(v1,argp)
           
+          case (Function(p,Right((PVar,x,t)),retty,e1), _) =>
+            Mem.alloc(args(0)) map {a => substfun(substitute(e1, Unary(Deref, a), x),p) }	
+            
           case (Function(p,Right((_,x,t)),retty,e1), _) => {
             val e1p = substitute(e1, args(0), x)
             doreturn(substfun(e1p, p))
@@ -395,7 +399,7 @@ object Lab5 extends jsy.util.JsyApplication {
         for (e1p <- step(e1)) yield If(e1p, e2, e3)
       case Obj(fields) => fields find { case (_, ei) => !isValue(ei) } match {
         case Some((fi,ei)) =>
-          for (eip <- step(ei)) yield eip
+          for (eip <- step(ei)) yield Obj(fields+(fi->eip))
         case None => throw StuckError(e)
       }
       case GetField(e1, f) => for (e1p <- step(e1)) yield GetField(e1p, f)
