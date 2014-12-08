@@ -1,0 +1,10 @@
+const x = { f: 3, g: 1 };
+var y = x;
+y = { f: 4, g: -1 };
+const plusOne = function plusOne(a: number): number { return a + 1 };
+const plusItself = function plusItself(name b: number): number { return b + b };
+plusItself( plusOne( y.g ) )
+plusItself( y.g = y.g + 1 )
+
+
+

@@ -13,19 +13,55 @@ class Lab5Spec extends FlatSpec {
   }
 
   // Probably want to write some tests for castOk, typeInfer, substitute, and step.
+  
   "DoNeg" should "negate values" in {
     val e = Unary(Neg, N(42))
     val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
-//    assert(mp === Mem.empty)
+    assert(mp.isEmpty)
     assertResult(N(-42)) { ep }
+  }
+  
+  "DoArith" should "sum numbers" in {
+    val e = Binary(Plus, N(2), N(3))
+    val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
+    assert(mp.isEmpty)
+    assertResult(N(5)) { ep }
+  }
+  
+  "DoInequalityString" should "compare strings with GE" in {
+    val e = Binary(Ge, S("abc"), S("xyz"))
+    val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
+    assert(mp.isEmpty)
+    assertResult(B(false)) { ep }
+  }
+  
+  "DoPlusString" should "concat strings" in {
+    val e = Binary(Plus, S("abc"), S("xyz"))
+    val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
+    assert(mp.isEmpty)
+    assertResult(S("abcxyz")) { ep }
   }
 
   "DoSeq" should "produce second element in sequence" in {
     val e = Binary(Seq, N(1), Binary(Plus, N(2), N(3)))
     val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
-//    assert(mp === Mem.empty)
+    assert(mp.isEmpty)
     assertResult(Binary(Plus, N(2), N(3))) { ep }
   }
+  
+  "DoAndTrue" should "not shortcircuiting boolean and" in {
+    val e = Binary(And, B(true), Decl(MVar, "x", B(true), Var("x")))
+    val (mp:Mem, ep: Expr) = step(e)(Mem.empty)
+    assert(mp.isEmpty)
+    assertResult(Decl(MVar, "x", B(true), Var("x"))) { ep }
+  }
+  
+  "DoObject" should "instantiate an object in memory" in {
+    val e = Obj(Map("a" -> N(42), "b" -> N(47)))
+    val (mp:Mem, a: A) = step(e)(Mem.empty)
+    assertResult(e) { mp.get(a).get }
+  }
+  
   "DoGetField" should "access a field from an object in memory" in {
     val setup = Obj(Map("a" -> N(42), "b" -> N(47)))
     val (m:Mem, addr: A) = step(setup)(Mem.empty)
@@ -55,5 +91,5 @@ class Lab5Spec extends FlatSpec {
       ep
     }
   }
- 
+
 }
